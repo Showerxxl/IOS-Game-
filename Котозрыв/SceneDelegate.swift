@@ -1,10 +1,3 @@
-//
-//  SceneDelegate.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -14,14 +7,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
-        
+
+        UIApplication.enableActionSound()
+
         let window = UIWindow(windowScene: windowScene)
         let mainViewController = MainScreenRouter.createModule()
         let navigationController = UINavigationController(rootViewController: mainViewController)
-        
+
         window.rootViewController = navigationController
         window.makeKeyAndVisible()
         self.window = window
+
+        SoundManager.shared.startBackgroundMusic()
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
@@ -32,13 +29,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        // Called when the scene has moved from an inactive state to an active state.
-        // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+        SoundManager.shared.startBackgroundMusic()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
-        // Called when the scene will move from an active state to an inactive state.
-        // This may occur due to temporary interruptions (ex. an incoming phone call).
+        SoundManager.shared.pauseBackgroundMusic()
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {

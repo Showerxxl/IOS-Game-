@@ -1,10 +1,3 @@
-//
-//  GameSettings.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import Foundation
 
 class GameSettings {
@@ -18,15 +11,17 @@ class GameSettings {
     
     var soundEffectsEnabled: Bool {
         get {
+            if UserDefaults.standard.object(forKey: soundEffectsKey) == nil { return true }
             return UserDefaults.standard.bool(forKey: soundEffectsKey)
         }
         set {
             UserDefaults.standard.set(newValue, forKey: soundEffectsKey)
         }
     }
-    
+
     var musicEnabled: Bool {
         get {
+            if UserDefaults.standard.object(forKey: musicKey) == nil { return true }
             return UserDefaults.standard.bool(forKey: musicKey)
         }
         set {

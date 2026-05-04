@@ -1,126 +1,158 @@
-//
-//  MainScreenView.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import UIKit
 
 protocol MainScreenViewProtocol: AnyObject {
     var presenter: MainScreenPresenterProtocol? { get set }
 }
 
-class MainScreenView: UIViewController {
-    
-    // MARK: - Properties
+final class MainScreenView: UIViewController {
+
     var presenter: MainScreenPresenterProtocol?
-    
-    // MARK: - UI Components
-    private let titleLabel: UILabel = {
-        let label = UILabel()
-        label.text = "ВЗРЫВНЫЕ КОТЯТА"
-        label.font = UIFont.boldSystemFont(ofSize: 32)
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let startButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("Начать игру", for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        button.backgroundColor = .systemBlue
-        button.setTitleColor(.white, for: .normal)
-        button.layer.cornerRadius = 12
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-    
-    private let settingsButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("Настройки", for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        button.backgroundColor = .systemGray
-        button.setTitleColor(.white, for: .normal)
-        button.layer.cornerRadius = 12
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-    
-    private let exitButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("Выход", for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        button.backgroundColor = .systemRed
-        button.setTitleColor(.white, for: .normal)
-        button.layer.cornerRadius = 12
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-    
-    // MARK: - Lifecycle
+
+    private let logoImageView = Theme.makeLogoImageView()
+    private let sloganLabel   = Theme.makeAccentLabel("КАРТОЧНАЯ ИГРА · СОЛО И ОНЛАЙН", size: 11, kerning: 4)
+
+    private let singlePlayerButton = MainScreenView.makeMenuButton(
+        title: "ОДИНОЧНАЯ ИГРА", subtitle: "ПРОТИВ ИИ", filled: true)
+    private let multiplayerButton  = MainScreenView.makeMenuButton(
+        title: "ОНЛАЙН-ИГРА", subtitle: "С ДРУЗЬЯМИ ПО КОДУ", filled: true)
+    private let settingsButton     = MainScreenView.makeMenuButton(
+        title: "НАСТРОЙКИ", subtitle: nil, filled: false)
+
+    private let decorExplodeCard = MainScreenView.makeDecorCard(imageName: "explode", angle: 15,  size: CGSize(width: 80, height: 104))
+    private let decorDefuseCard  = MainScreenView.makeDecorCard(imageName: "defuse",  angle: -18, size: CGSize(width: 80, height: 104))
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        setupActions()
+        bindActions()
         presenter?.viewDidLoad()
     }
-    
-    // MARK: - Setup
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        Theme.styleNavigationController(self)
+    }
+
     private func setupUI() {
-        view.backgroundColor = .systemBackground
-        
-        view.addSubview(titleLabel)
-        view.addSubview(startButton)
-        view.addSubview(settingsButton)
-        view.addSubview(exitButton)
-        
+        Theme.installBackground(on: view)
+
+        view.addSubview(decorExplodeCard)
+        view.addSubview(decorDefuseCard)
+
+        view.addSubview(logoImageView)
+        view.addSubview(sloganLabel)
+
+        let buttonStack = UIStackView(arrangedSubviews: [singlePlayerButton, multiplayerButton, settingsButton])
+        buttonStack.axis = .vertical
+        buttonStack.spacing = 16
+        buttonStack.alignment = .center
+        buttonStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(buttonStack)
+
         NSLayoutConstraint.activate([
-            titleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 100),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            
-            startButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            startButton.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            startButton.widthAnchor.constraint(equalToConstant: 250),
-            startButton.heightAnchor.constraint(equalToConstant: 50),
-            
-            settingsButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            settingsButton.topAnchor.constraint(equalTo: startButton.bottomAnchor, constant: 20),
-            settingsButton.widthAnchor.constraint(equalToConstant: 250),
-            settingsButton.heightAnchor.constraint(equalToConstant: 50),
-            
-            exitButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            exitButton.topAnchor.constraint(equalTo: settingsButton.bottomAnchor, constant: 20),
-            exitButton.widthAnchor.constraint(equalToConstant: 250),
-            exitButton.heightAnchor.constraint(equalToConstant: 50)
+            logoImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 60),
+            logoImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            logoImageView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.82),
+            logoImageView.heightAnchor.constraint(equalToConstant: 120),
+
+            sloganLabel.topAnchor.constraint(equalTo: logoImageView.bottomAnchor, constant: 16),
+            sloganLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            sloganLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+
+            buttonStack.topAnchor.constraint(equalTo: sloganLabel.bottomAnchor, constant: 50),
+            buttonStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+
+            singlePlayerButton.widthAnchor.constraint(equalToConstant: 244),
+            multiplayerButton.widthAnchor.constraint(equalToConstant: 244),
+            settingsButton.widthAnchor.constraint(equalToConstant: 244),
+
+            decorExplodeCard.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -50),
+            decorExplodeCard.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+
+            decorDefuseCard.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -50),
+            decorDefuseCard.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14)
         ])
     }
-    
-    private func setupActions() {
-        startButton.addTarget(self, action: #selector(startButtonTapped), for: .touchUpInside)
-        settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
-        exitButton.addTarget(self, action: #selector(exitButtonTapped), for: .touchUpInside)
+
+    private func bindActions() {
+        singlePlayerButton.addTarget(self, action: #selector(singleTapped),   for: .touchUpInside)
+        multiplayerButton.addTarget(self,  action: #selector(multiTapped),    for: .touchUpInside)
+        settingsButton.addTarget(self,     action: #selector(settingsTapped), for: .touchUpInside)
     }
-    
-    // MARK: - Actions
-    @objc private func startButtonTapped() {
-        presenter?.startButtonTapped()
+
+    @objc private func singleTapped()   { presenter?.singlePlayerButtonTapped() }
+    @objc private func multiTapped()    { presenter?.multiplayerButtonTapped() }
+    @objc private func settingsTapped() { presenter?.settingsButtonTapped() }
+
+    // MARK: - Helpers
+
+    private static func makeMenuButton(title: String, subtitle: String?, filled: Bool) -> UIButton {
+        let button = UIButton(type: .custom)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.heightAnchor.constraint(equalToConstant: filled ? 62 : 54).isActive = true
+        button.layer.cornerRadius = (filled ? 62 : 54) / 2
+
+        if filled {
+            button.backgroundColor = Theme.Palette.yellow
+            button.layer.shadowColor = UIColor.black.cgColor
+            button.layer.shadowOpacity = 0.25
+            button.layer.shadowRadius = 8
+            button.layer.shadowOffset = CGSize(width: 0, height: 4)
+        } else {
+            button.backgroundColor = .clear
+            button.layer.borderColor = Theme.Palette.yellow.cgColor
+            button.layer.borderWidth = 2
+        }
+
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = Theme.notable(14)
+        titleLabel.textColor = filled ? Theme.Palette.black : Theme.Palette.yellow
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.isUserInteractionEnabled = false
+
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 2
+        stack.isUserInteractionEnabled = false
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(titleLabel)
+
+        if let subtitle = subtitle {
+            let subLabel = UILabel()
+            subLabel.text = subtitle
+            subLabel.font = Theme.notable(9)
+            subLabel.textColor = filled ? Theme.Palette.black.withAlphaComponent(0.65) : Theme.Palette.yellow.withAlphaComponent(0.65)
+            subLabel.textAlignment = .center
+            subLabel.translatesAutoresizingMaskIntoConstraints = false
+            stack.addArrangedSubview(subLabel)
+        }
+
+        button.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: button.centerYAnchor)
+        ])
+        return button
     }
-    
-    @objc private func settingsButtonTapped() {
-        presenter?.settingsButtonTapped()
-    }
-    
-    @objc private func exitButtonTapped() {
-        presenter?.exitButtonTapped()
+
+    private static func makeDecorCard(imageName: String, angle: CGFloat, size: CGSize) -> UIImageView {
+        let iv = UIImageView(image: UIImage(named: imageName))
+        iv.contentMode = .scaleAspectFill
+        iv.clipsToBounds = true
+        iv.layer.cornerRadius = 10
+        iv.layer.shadowColor = UIColor.black.cgColor
+        iv.layer.shadowOpacity = 0.45
+        iv.layer.shadowRadius = 6
+        iv.layer.shadowOffset = CGSize(width: 0, height: 4)
+        iv.transform = CGAffineTransform(rotationAngle: angle * .pi / 180)
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        iv.widthAnchor.constraint(equalToConstant: size.width).isActive = true
+        iv.heightAnchor.constraint(equalToConstant: size.height).isActive = true
+        return iv
     }
 }
 
-// MARK: - MainScreenViewProtocol
-extension MainScreenView: MainScreenViewProtocol {
-    
-}
+extension MainScreenView: MainScreenViewProtocol {}

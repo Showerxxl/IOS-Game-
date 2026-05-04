@@ -1,10 +1,3 @@
-//
-//  GameScreenInteractor.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import Foundation
 
 protocol GameScreenInteractorProtocol: AnyObject {
@@ -22,6 +15,8 @@ protocol GameScreenInteractorOutputProtocol: AnyObject {
     func promptPlayerSelection(availablePlayers: [Player], completion: @escaping (Player) -> Void)
     func promptCardSelection(from player: Player, completion: @escaping (CardType?) -> Void)
     func cardEffectApplied(message: String)
+    func cardStolen(card: Card, from sender: Player, to receiver: Player)
+    func promptCardFromHand(of target: Player, requesterName: String, completion: @escaping (Card?) -> Void)
 }
 
 class GameScreenInteractor {
@@ -31,39 +26,31 @@ class GameScreenInteractor {
     private func createInitialDeck(playerCount: Int) -> [Card] {
         var deck: [Card] = []
         
-        // Добавляем карты согласно правилам
-        // Неть - 5 карт
         for _ in 0..<5 {
             deck.append(Card(type: .nope))
         }
         
-        // Нападай - 4 карты
         for _ in 0..<4 {
             deck.append(Card(type: .attack))
         }
         
-        // Слиняй - 4 карты
         for _ in 0..<4 {
             deck.append(Card(type: .skip))
         }
         
-        // Подлижись - 4 карты
         for _ in 0..<4 {
             deck.append(Card(type: .favor))
         }
         
-        // Затасуй - 4 карты
         for _ in 0..<4 {
             deck.append(Card(type: .shuffle))
         }
         
-        // Подсмотри грядущее - 5 карт
         for _ in 0..<5 {
             deck.append(Card(type: .seeTheFuture))
         }
         
-        // Кошкокарты - по 4 каждого вида
-        let catCards: [CardType] = [.catCard1, .catCard2, .catCard3, .catCard4, .catCard5]
+        let catCards: [CardType] = [.catBeard, .catTaco, .catWatermelon, .catPotato]
         for catType in catCards {
             for _ in 0..<4 {
                 deck.append(Card(type: catType))
@@ -74,9 +61,7 @@ class GameScreenInteractor {
     }
     
     private func dealInitialCards(to players: [Player], from deck: inout [Card]) {
-        // Раздаем каждому игроку по 7 карт + 1 Обезвредь
         for player in players {
-            // 7 карт из колоды
             for _ in 0..<7 {
                 if !deck.isEmpty {
                     let card = deck.removeFirst()
@@ -84,14 +69,11 @@ class GameScreenInteractor {
                 }
             }
             
-            // 1 Обезвредь карта
             player.addCard(Card(type: .defuse))
         }
     }
     
     private func addDefuseCards(to deck: inout [Card], playerCount: Int) {
-        // Добавляем оставшиеся Обезвредь карты в колоду
-        // Для игры вдвоем и втроем - 2 карты, для остальных - больше
         let defuseCount = playerCount <= 3 ? 2 : (6 - playerCount)
         for _ in 0..<defuseCount {
             deck.append(Card(type: .defuse))
@@ -99,7 +81,6 @@ class GameScreenInteractor {
     }
     
     private func addExplodingKittens(to deck: inout [Card], playerCount: Int) {
-        // Добавляем взрывных котят (количество игроков - 1)
         for _ in 0..<(playerCount - 1) {
             deck.append(Card(type: .explodingKitten))
         }
@@ -124,7 +105,7 @@ class GameScreenInteractor {
             handleSeeTheFutureCard(gameState: gameState)
             
         case .nope:
-            presenter?.cardEffectApplied(message: "Неть! Действие отменено")
+            presenter?.cardEffectApplied(message: "Nope! Action cancelled")
             
         default:
             break
@@ -132,100 +113,149 @@ class GameScreenInteractor {
     }
     
     private func handleAttackCard(player: Player, gameState: GameState) {
+        let leftoverTurns = max(0, player.turnsRemaining - 1)
+        player.turnsRemaining = 0
         gameState.nextPlayer()
         if let nextPlayer = gameState.currentPlayer {
-            nextPlayer.turnsRemaining += 2
-            presenter?.cardEffectApplied(message: "\(nextPlayer.name) должен сходить дважды!")
+            nextPlayer.turnsRemaining = leftoverTurns + 2
+            presenter?.cardEffectApplied(
+                message: "\(nextPlayer.name) ходит \(nextPlayer.turnsRemaining) раз!")
         }
     }
     
     private func handleSkipCard(player: Player, gameState: GameState) {
-        if player.turnsRemaining > 0 {
-            player.turnsRemaining -= 1
-        }
-        presenter?.cardEffectApplied(message: "\(player.name) пропускает ход")
+        presenter?.cardEffectApplied(message: "\(player.name) skips their turn")
     }
     
     private func handleFavorCard(player: Player, gameState: GameState) {
         let otherPlayers = gameState.players.filter { $0.id != player.id && $0.isAlive && !$0.hand.isEmpty }
-        
+
         guard !otherPlayers.isEmpty else {
-            presenter?.cardEffectApplied(message: "Нет игроков, у которых можно взять карту")
+            presenter?.cardEffectApplied(message: "No players to steal from")
             return
         }
-        
-        presenter?.promptPlayerSelection(availablePlayers: otherPlayers) { [weak self] selectedPlayer in
-            if let randomCard = selectedPlayer.hand.randomElement(),
-               let removedCard = selectedPlayer.removeCard(randomCard) {
-                player.addCard(removedCard)
-                self?.presenter?.cardEffectApplied(message: "\(player.name) взял карту у \(selectedPlayer.name)")
+
+        if player.type == .ai {
+            guard let target = otherPlayers.max(by: { $0.hand.count < $1.hand.count }) else { return }
+            executeFavorTransfer(from: target, to: player)
+        } else {
+            presenter?.promptPlayerSelection(availablePlayers: otherPlayers) { [weak self] target in
+                self?.executeFavorTransfer(from: target, to: player)
             }
         }
+    }
+
+
+    private func executeFavorTransfer(from target: Player, to attacker: Player) {
+        guard !target.hand.isEmpty else {
+            presenter?.cardEffectApplied(message: "У \(target.name) нет карт")
+            return
+        }
+
+        if target.type == .human {
+            presenter?.promptCardFromHand(of: target, requesterName: attacker.name) { [weak self] picked in
+                guard let self = self else { return }
+                let card = picked ?? target.hand.first
+                guard let chosen = card, let removed = target.removeCard(chosen) else { return }
+                attacker.addCard(removed)
+                self.presenter?.cardStolen(card: removed, from: target, to: attacker)
+            }
+        } else {
+            guard let chosen = aiChoosesCardToGive(target: target),
+                  let removed = target.removeCard(chosen) else { return }
+            attacker.addCard(removed)
+            presenter?.cardStolen(card: removed, from: target, to: attacker)
+        }
+    }
+
+
+    private func aiChoosesCardToGive(target: Player) -> Card? {
+        let priority: [CardType] = [
+            .catBeard, .catTaco, .catWatermelon, .catPotato,
+            .seeTheFuture, .shuffle,
+            .skip, .favor, .attack,
+            .nope,
+            .defuse
+        ]
+        for type in priority {
+            if let c = target.hand.first(where: { $0.type == type }) {
+                return c
+            }
+        }
+        return target.hand.first
     }
     
     private func handleShuffleCard(gameState: GameState) {
         gameState.deck.shuffle()
-        presenter?.cardEffectApplied(message: "Колода перетасована")
+        presenter?.cardEffectApplied(message: "Deck shuffled")
     }
     
     private func handleSeeTheFutureCard(gameState: GameState) {
         let cardsToShow = Array(gameState.deck.prefix(3))
         presenter?.showSeeTheFutureCards(cardsToShow)
     }
+    
+    private func selectCardToStealByAI(from player: Player) -> Card? {
+        let priority: [CardType] = [.defuse, .attack, .skip, .shuffle, .favor, .seeTheFuture, .nope]
+        
+        for cardType in priority {
+            if let card = player.hand.first(where: { $0.type == cardType }) {
+                return card
+            }
+        }
+        
+        return player.hand.first
+    }
 }
 
 // MARK: - GameScreenInteractorProtocol
 extension GameScreenInteractor: GameScreenInteractorProtocol {
     func setupGame(gameState: GameState) {
-        // Создаем игроков
+
         let playerCount = gameState.gameMode.totalPlayers
         
-        // Добавляем человека
-        let humanPlayer = Player(name: "Игрок", type: .human)
+
+        let humanPlayer = Player(name: "Player", type: .human)
         gameState.players.append(humanPlayer)
         
-        // Добавляем ИИ
         if case .singlePlayer(let aiCount) = gameState.gameMode {
             for i in 1...aiCount {
-                let aiPlayer = Player(name: "ИИ \(i)", type: .ai)
+                let aiPlayer = Player(name: "AI \(i)", type: .ai)
                 gameState.players.append(aiPlayer)
             }
         }
         
-        // Создаем колоду
         var deck = createInitialDeck(playerCount: playerCount)
         
-        // Раздаем карты
         dealInitialCards(to: gameState.players, from: &deck)
         
-        // Добавляем оставшиеся Обезвредь карты
+  
         addDefuseCards(to: &deck, playerCount: playerCount)
         
-        // Добавляем взрывных котят
+     
         addExplodingKittens(to: &deck, playerCount: playerCount)
         
-        // Перемешиваем и сохраняем колоду
+
         deck.shuffle()
         gameState.deck = deck
         
-        // Устанавливаем первого игрока
         gameState.currentPlayerIndex = 0
     }
     
     func drawCard(for player: Player, gameState: GameState) {
         guard !gameState.deck.isEmpty else {
-            presenter?.cardEffectApplied(message: "Колода пуста")
+            presenter?.cardEffectApplied(message: "Deck is empty")
             return
         }
         
         let card = gameState.deck.removeFirst()
         
         if card.type == .explodingKitten {
-            // Проверяем, есть ли у игрока Обезвредь карта
+
             let hasDefuse = player.hasCard(ofType: .defuse)
             
             if hasDefuse {
-                // Удаляем Обезвредь карту из руки
+       
                 if let defuseCard = player.getCards(ofType: .defuse).first {
                     _ = player.removeCard(defuseCard)
                     gameState.discardPile.append(defuseCard)

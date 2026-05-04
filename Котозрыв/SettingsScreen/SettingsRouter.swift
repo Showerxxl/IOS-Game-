@@ -1,15 +1,9 @@
-//
-//  SettingsRouter.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import UIKit
 
 protocol SettingsRouterProtocol: AnyObject {
     static func createModule(fromScreen: SettingsSourceScreen) -> UIViewController
     func dismiss()
+    func navigateToRules()
 }
 
 enum SettingsSourceScreen {
@@ -42,9 +36,14 @@ class SettingsRouter {
     }
 }
 
-// MARK: - SettingsRouterProtocol
 extension SettingsRouter: SettingsRouterProtocol {
     func dismiss() {
         viewController?.dismiss(animated: true)
+    }
+
+    func navigateToRules() {
+        let rules = RulesView()
+        rules.modalPresentationStyle = .fullScreen
+        viewController?.present(rules, animated: true)
     }
 }

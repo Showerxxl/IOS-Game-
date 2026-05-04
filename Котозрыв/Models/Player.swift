@@ -1,10 +1,3 @@
-//
-//  Player.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import Foundation
 
 enum PlayerType {
@@ -14,14 +7,16 @@ enum PlayerType {
 
 class Player {
     let id: UUID
+    let networkID: String?
     let name: String
     let type: PlayerType
     var hand: [Card]
     var isAlive: Bool
     var turnsRemaining: Int
-    
-    init(name: String, type: PlayerType) {
+
+    init(name: String, type: PlayerType, networkID: String? = nil) {
         self.id = UUID()
+        self.networkID = networkID
         self.name = name
         self.type = type
         self.hand = []

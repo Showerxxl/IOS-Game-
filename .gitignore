@@ -91,3 +91,8 @@ iOSInjectionProject/
 
 # DS_Store
 .DS_Store
+
+# Project-specific
+*.md
+design/
+**/design/

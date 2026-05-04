@@ -7,4 +7,3 @@
 
 import Foundation
 
-// Сущности для игрового экрана определены в общих моделях (Card, Player, GameState)

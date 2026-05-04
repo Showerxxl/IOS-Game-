@@ -1,17 +1,10 @@
-//
-//  MainScreenRouter.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import UIKit
 
 protocol MainScreenRouterProtocol: AnyObject {
     static func createModule() -> UIViewController
-    func navigateToGameSession()
+    func navigateToSinglePlayerGameSession()
+    func navigateToMultiplayerGame()
     func navigateToSettings()
-    func exitApp()
 }
 
 class MainScreenRouter {
@@ -36,17 +29,18 @@ class MainScreenRouter {
 
 // MARK: - MainScreenRouterProtocol
 extension MainScreenRouter: MainScreenRouterProtocol {
-    func navigateToGameSession() {
+    func navigateToSinglePlayerGameSession() {
         let gameSessionVC = GameSessionRouter.createModule()
         viewController?.navigationController?.pushViewController(gameSessionVC, animated: true)
+    }
+    
+    func navigateToMultiplayerGame() {
+        let multiplayerVC = MultiplayerLobbyView()
+        viewController?.navigationController?.pushViewController(multiplayerVC, animated: true)
     }
     
     func navigateToSettings() {
         let settingsVC = SettingsRouter.createModule(fromScreen: .mainMenu)
         viewController?.present(settingsVC, animated: true)
-    }
-    
-    func exitApp() {
-        exit(0)
     }
 }

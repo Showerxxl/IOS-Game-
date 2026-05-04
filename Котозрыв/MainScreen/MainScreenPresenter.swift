@@ -1,10 +1,3 @@
-//
-//  MainScreenPresenter.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import Foundation
 
 protocol MainScreenPresenterProtocol: AnyObject {
@@ -13,9 +6,9 @@ protocol MainScreenPresenterProtocol: AnyObject {
     var router: MainScreenRouterProtocol? { get set }
     
     func viewDidLoad()
-    func startButtonTapped()
+    func singlePlayerButtonTapped()
+    func multiplayerButtonTapped()
     func settingsButtonTapped()
-    func exitButtonTapped()
 }
 
 class MainScreenPresenter {
@@ -24,21 +17,19 @@ class MainScreenPresenter {
     var router: MainScreenRouterProtocol?
 }
 
-// MARK: - MainScreenPresenterProtocol
 extension MainScreenPresenter: MainScreenPresenterProtocol {
     func viewDidLoad() {
-        // Инициализация при загрузке
     }
     
-    func startButtonTapped() {
-        router?.navigateToGameSession()
+    func singlePlayerButtonTapped() {
+        router?.navigateToSinglePlayerGameSession()
+    }
+    
+    func multiplayerButtonTapped() {
+        router?.navigateToMultiplayerGame()
     }
     
     func settingsButtonTapped() {
         router?.navigateToSettings()
-    }
-    
-    func exitButtonTapped() {
-        router?.exitApp()
     }
 }

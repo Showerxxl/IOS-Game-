@@ -1,10 +1,3 @@
-//
-//  SettingsPresenter.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import Foundation
 
 protocol SettingsPresenterProtocol: AnyObject {
@@ -17,6 +10,7 @@ protocol SettingsPresenterProtocol: AnyObject {
     func musicToggled(_ enabled: Bool)
     func volumeChanged(_ value: Float)
     func closeButtonTapped()
+    func rulesButtonTapped()
 }
 
 class SettingsPresenter {
@@ -25,7 +19,6 @@ class SettingsPresenter {
     var router: SettingsRouterProtocol?
 }
 
-// MARK: - SettingsPresenterProtocol
 extension SettingsPresenter: SettingsPresenterProtocol {
     func viewDidLoad() {
         let settings = interactor?.loadSettings()
@@ -48,5 +41,9 @@ extension SettingsPresenter: SettingsPresenterProtocol {
     
     func closeButtonTapped() {
         router?.dismiss()
+    }
+
+    func rulesButtonTapped() {
+        router?.navigateToRules()
     }
 }

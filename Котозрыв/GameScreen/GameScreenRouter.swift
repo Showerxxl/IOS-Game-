@@ -1,10 +1,3 @@
-//
-//  GameScreenRouter.swift
-//  Котозрыв
-//
-//  Created by Mac on 04.02.2026.
-//
-
 import UIKit
 
 protocol GameScreenRouterProtocol: AnyObject {
@@ -15,7 +8,20 @@ protocol GameScreenRouterProtocol: AnyObject {
 
 class GameScreenRouter {
     weak var viewController: UIViewController?
-    
+
+    static func createMultiplayerModule(myPlayerId: String, roomId: String) -> UIViewController {
+        let view      = GameScreenView()
+        let presenter = MultiplayerGamePresenter(myPlayerId: myPlayerId, roomId: roomId)
+        let router    = GameScreenRouter()
+
+        view.presenter      = presenter
+        presenter.view      = view
+        presenter.router    = router
+        router.viewController = view
+
+        return view
+    }
+
     static func createModule(with gameState: GameState) -> UIViewController {
         let view = GameScreenView()
         let presenter = GameScreenPresenter(gameState: gameState)
