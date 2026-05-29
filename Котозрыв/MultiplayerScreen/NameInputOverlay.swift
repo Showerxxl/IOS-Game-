@@ -141,6 +141,15 @@ final class NameInputOverlay: UIView {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(backdropTapped))
         backdrop.addGestureRecognizer(tap)
+
+        // Тап по самой панели (вне поля ввода) — спрятать клавиатуру.
+        let panelTap = UITapGestureRecognizer(target: self, action: #selector(panelTapped))
+        panelTap.cancelsTouchesInView = false
+        panel.addGestureRecognizer(panelTap)
+    }
+
+    @objc private func panelTapped() {
+        textField.resignFirstResponder()
     }
 
     // MARK: - Actions

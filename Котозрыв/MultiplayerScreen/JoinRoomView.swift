@@ -14,6 +14,14 @@ final class JoinRoomView: UIViewController {
         setupUI()
         bindActions()
         updateJoinButton()
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -83,27 +91,60 @@ final class JoinRoomView: UIViewController {
     @objc private func joinTapped() {
         let code = codeFields.compactMap { $0.text }.joined().uppercased()
         guard code.count == 6 else { return }
+        view.endEditing(true)
 
         askForName { [weak self] name in
             guard let self = self else { return }
             self.joinButton.isEnabled = false
+            self.showLoading(true)
+            print("[JOIN] Trying to join room \(code) as \(name)…")
 
             NetworkClient.shared.joinRoom(roomId: code, name: name) { [weak self] result in
                 guard let self = self else { return }
+                self.showLoading(false)
                 self.joinButton.isEnabled = true
                 switch result {
                 case .failure(let e):
-                    let alert = UIAlertController(title: "Ошибка", message: e.localizedDescription,
+                    print("[JOIN] failed: \(e.localizedDescription)")
+                    let msg = "\(e.localizedDescription)\n\nПроверьте:\n• сервер запущен и доступен по IP \(NetworkClient.serverHost):\(NetworkClient.serverPort)\n• оба устройства в одной Wi-Fi\n• код комнаты введён верно"
+                    let alert = UIAlertController(title: "Не удалось войти", message: msg,
                                                   preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "OK", style: .default))
                     self.present(alert, animated: true)
                 case .success(let join):
+                    print("[JOIN] success, player_id=\(join.player_id)")
                     NetworkClient.shared.connectWebSocket(
                         playerId: join.player_id, roomId: code)
                     let lobby = RoomLobbyView(roomId: code, myPlayerId: join.player_id, isHost: false)
                     self.navigationController?.pushViewController(lobby, animated: true)
                 }
             }
+        }
+    }
+
+    private func showLoading(_ show: Bool) {
+        let tag = 7777
+        if show {
+            let overlay = UIView()
+            overlay.tag = tag
+            overlay.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+            overlay.translatesAutoresizingMaskIntoConstraints = false
+            let spinner = UIActivityIndicatorView(style: .large)
+            spinner.color = Theme.Palette.yellow
+            spinner.startAnimating()
+            spinner.translatesAutoresizingMaskIntoConstraints = false
+            overlay.addSubview(spinner)
+            view.addSubview(overlay)
+            NSLayoutConstraint.activate([
+                overlay.topAnchor.constraint(equalTo: view.topAnchor),
+                overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+                overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                spinner.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+                spinner.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            ])
+        } else {
+            view.viewWithTag(tag)?.removeFromSuperview()
         }
     }
 
@@ -126,6 +167,7 @@ final class JoinRoomView: UIViewController {
         f.layer.borderWidth = 2
         f.autocapitalizationType = .allCharacters
         f.autocorrectionType = .no
+        f.returnKeyType = .done
         f.delegate = self
         f.addTarget(self, action: #selector(fieldChanged(_:)), for: .editingChanged)
         f.translatesAutoresizingMaskIntoConstraints = false
@@ -231,6 +273,11 @@ extension JoinRoomView: UITextFieldDelegate {
             }
             return false
         }
+        return true
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
         return true
     }
 }

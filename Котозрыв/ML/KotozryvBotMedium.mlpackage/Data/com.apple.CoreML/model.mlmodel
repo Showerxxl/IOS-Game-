@@ -1,0 +1,223 @@
+
+
+observation
+*
+†ÄR
+q_values
+*
+†Ä¢π
+ –ö–æ—Ç–æ–∑—Ä—ã–≤ DQN-–±–æ—Ç: –≤—Ö–æ–¥ ‚Äî –≤–µ–∫—Ç–æ—Ä —Å–æ—Å—Ç–æ—è–Ω–∏—è (31), –≤—ã—Ö–æ–¥ ‚Äî Q-–∑–Ω–∞—á–µ–Ω–∏—è 8 –¥–µ–π—Å—Ç–≤–∏–π (DRAW, ATTACK, SKIP, FAVOR, SHUFFLE, SEE_FUTURE, CAT_PAIR, CAT_TRIO).Kotozryv ML¢:
++com.github.apple.coremltools.source_dialectTorchScript¢4
+#com.github.apple.coremltools.sourcetorch==2.12.0¢:
+,com.github.apple.coremltools.conversion_date
+2026-05-28¢+
+$com.github.apple.coremltools.version9.0≤¯ä
+mainÅ
+!
+observation
+
+
+CoreML5“
+CoreML5∆q_valuesÇ
+const
+
+net_0_bias
+
+Ä* 
+name
+
+"
+
+net_0_bias*:
+val3
+
+Ä*"
+@model_path/weights/weight.bin@ì
+const#
+net_0_weight
+
+Ä
+*"
+name
+
+"
+net_0_weight*A
+val:
+
+Ä
+*#
+@model_path/weights/weight.binÄ	Ñ
+const
+
+net_2_bias
+
+Ä* 
+name
+
+"
+
+net_2_bias*<
+val5
+
+Ä*$
+@model_path/weights/weight.bin¿Åñ
+const$
+net_2_weight
+
+Ä
+Ä*"
+name
+
+"
+net_2_weight*C
+val<
+
+Ä
+Ä*$
+@model_path/weights/weight.binÄÜÑ
+const
+
+net_4_bias
+
+
+* 
+name
+
+"
+
+net_4_bias*=
+val6
+
+
+&
+$
+"
+ œıN>ò§ˇº(6û=TπK>HT˙=˛s>ìÕ>X‘r>î
+const#
+net_4_weight
+
+
+Ä*"
+name
+
+"
+net_4_weight*B
+val;
+
+
+Ä*$
+@model_path/weights/weight.bin¿Ü
+í
+linear
+x
+
+observation
+weight
+
+net_0_weight
+bias
+
+
+net_0_bias
+input_1
+
+
+Ä*
+name
+
+"
+
+linear_0W
+relu
+x
+	
+input_1
+input_3
+
+
+Ä*
+name
+
+"	
+input_3é
+linear
+x
+	
+input_3
+weight
+
+net_2_weight
+bias
+
+
+net_2_bias
+input_5
+
+
+Ä*
+name
+
+"
+
+linear_1S
+relu
+x
+	
+input_5
+input
+
+
+Ä*
+name
+
+	"
+inputå
+linear
+x	
+
+input
+weight
+
+net_4_weight
+bias
+
+
+net_4_bias
+q_values
+
+
+*
+name
+
+"
+
+linear_2"Ê
+	buildInfoÿ"
+
+
+≈"¬
+6
+!
+
+"
+coremltools-version
+	
+"
+9.0
+A
+)
+!
+"
+coremltools-component-torch
+
+
+"
+2.12.0
+E
+(
+ 
+"
+coremltools-source-dialect
+
+"
+TorchScript

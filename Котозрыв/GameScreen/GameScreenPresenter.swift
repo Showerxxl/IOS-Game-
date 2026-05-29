@@ -31,8 +31,28 @@ class GameScreenPresenter {
 
     private var aiTopCardsKnowledge: [CardType] = []
 
-    init(gameState: GameState) {
+    // MARK: - ML-бот
+    /// Сложность бота (выбирает обученный чекпойнт DQN). По умолчанию — максимальная.
+    private let botDifficulty: BotDifficulty
+    private lazy var mlBot = MLBotService(difficulty: botDifficulty)
+    /// Приватное знание верхних карт колоды для каждого AI (после See the Future).
+    private var aiKnownTop: [UUID: [CardType]] = [:]
+    /// Счётчик «не завершающих» действий в текущем ходу бота (защита от зацикливания).
+    private var mlChainCount = 0
+    private let mlMaxChain = 6
+
+    // MARK: - Личный коуч (LSTM)
+    private let coachService = CoachService()
+    private var coachRecords: [CoachMoveRecord] = []
+    private var humanTurnCounter = 0
+
+    /// Блокировка повторного ввода человека, пока его текущее действие не завершилось
+    /// (защита от «протапывания» нескольких карт за один ход).
+    private var isHumanBusy = false
+
+    init(gameState: GameState, botDifficulty: BotDifficulty = .hard) {
         self.gameState = gameState
+        self.botDifficulty = botDifficulty
     }
     
     var players: [Player] {
@@ -67,18 +87,118 @@ class GameScreenPresenter {
         guard let aiPlayer = gameState.currentPlayer, aiPlayer.type == .ai else { return }
 
         view?.showMessage("\(aiPlayer.name) думает...")
+        mlChainCount = 0
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self = self else { return }
             guard self.gameState.currentPlayer?.id == aiPlayer.id, aiPlayer.isAlive else { return }
+            self.performMLBotAction(for: aiPlayer)
+        }
+    }
 
-            if let comboCards = self.chooseCatComboForAI(aiPlayer) {
-                self.playAICatCombo(comboCards, by: aiPlayer)
-            } else if let cardToPlay = self.chooseBestCardForAI(aiPlayer) {
-                self.playAICard(cardToPlay, by: aiPlayer)
+    /// Запросить у DQN-модели действие и выполнить его, переиспользуя
+    /// существующие методы анимации/логики (playAICard / playAICatCombo / draw).
+    private func performMLBotAction(for aiPlayer: Player) {
+        guard gameState.currentPlayer?.id == aiPlayer.id, aiPlayer.isAlive else { return }
+
+        let known = aiKnownTop[aiPlayer.id] ?? []
+        let action = mlBot.decide(gameState: gameState, player: aiPlayer, knownTop: known)
+
+        switch action {
+        case .draw:
+            performDrawCard()
+
+        case .attack:
+            playSingleAICard(.attack, by: aiPlayer)
+        case .skip:
+            playSingleAICard(.skip, by: aiPlayer)
+        case .favor:
+            playSingleAICard(.favor, by: aiPlayer)
+        case .shuffle:
+            playSingleAICard(.shuffle, by: aiPlayer)
+        case .seeFuture:
+            playSingleAICard(.seeTheFuture, by: aiPlayer)
+
+        case .catPair:
+            if let cat = MLBotService.bestCatGroup(player: aiPlayer, size: 2) {
+                playAICatCombo(Array(aiPlayer.getCards(ofType: cat).prefix(2)), by: aiPlayer)
             } else {
-                self.performDrawCard()
+                performDrawCard()
             }
+        case .catTrio:
+            if let cat = MLBotService.bestCatGroup(player: aiPlayer, size: 3) {
+                playAICatCombo(Array(aiPlayer.getCards(ofType: cat).prefix(3)), by: aiPlayer)
+            } else {
+                performDrawCard()
+            }
+        }
+    }
+
+    /// Записать ход игрока-человека для последующего разбора коучем.
+    /// Вызывается ДО изменения состояния игры (чтобы зафиксировать позицию).
+    private func recordHumanDecision(_ action: BotAction, by player: Player) {
+        guard player.type == .human else { return }
+        let known = aiKnownTop[player.id] ?? []
+        let obs = BotObservation.encode(gameState: gameState, player: player, knownTop: known)
+        // признак шага = obs(31) + one-hot действия(8)
+        var feature = obs
+        var onehot = [Float](repeating: 0, count: BotAction.allCases.count)
+        onehot[action.rawValue] = 1
+        feature.append(contentsOf: onehot)
+        // оракул: что сходил бы обученный DQN в этой позиции
+        let oracle = mlBot.decide(gameState: gameState, player: player, knownTop: known)
+        let danger = gameState.deck.isEmpty ? 0
+            : Float(gameState.deck.filter { $0.type == .explodingKitten }.count) / Float(gameState.deck.count)
+        humanTurnCounter += 1
+        coachRecords.append(CoachMoveRecord(
+            feature: feature,
+            humanAction: action,
+            oracleAction: oracle,
+            turnNumber: humanTurnCounter,
+            danger: danger))
+    }
+
+    /// Сопоставить тип карты действию бота (для записи ходов человека).
+    private func botAction(forSingle cardType: CardType) -> BotAction? {
+        switch cardType {
+        case .attack:       return .attack
+        case .skip:         return .skip
+        case .favor:        return .favor
+        case .shuffle:      return .shuffle
+        case .seeTheFuture: return .seeFuture
+        default:            return nil   // одиночный кот / прочее не входит в action space
+        }
+    }
+
+    /// Сдвинуть знание верхних карт игрока после того, как он взял карту.
+    private func popKnownTop(for player: Player) {
+        guard var known = aiKnownTop[player.id], !known.isEmpty else { return }
+        known.removeFirst()
+        aiKnownTop[player.id] = known
+    }
+
+    private func playSingleAICard(_ type: CardType, by aiPlayer: Player) {
+        if let card = aiPlayer.getCards(ofType: type).first {
+            playAICard(card, by: aiPlayer)
+        } else {
+            performDrawCard()
+        }
+    }
+
+    /// Продолжить ход бота после «не завершающего» действия (favor/shuffle/see/коты):
+    /// бот может сходить ещё раз (цепочка), пока не возьмёт карту или не сыграет skip/attack.
+    private func continueMLBotTurn(for aiPlayer: Player) {
+        guard gameState.currentPlayer?.id == aiPlayer.id, aiPlayer.isAlive else {
+            triggerAITurnIfNeeded()
+            return
+        }
+        mlChainCount += 1
+        if mlChainCount > mlMaxChain {
+            performDrawCard()
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.performMLBotAction(for: aiPlayer)
         }
     }
     
@@ -151,9 +271,7 @@ class GameScreenPresenter {
             let opponents = self.gameState.players
                 .filter { $0.id != aiPlayer.id && $0.isAlive && !$0.hand.isEmpty }
             guard let target = opponents.max(by: { $0.hand.count < $1.hand.count }) else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.performDrawCard()
-                }
+                self.continueMLBotTurn(for: aiPlayer)
                 return
             }
 
@@ -172,9 +290,7 @@ class GameScreenPresenter {
                 self.view?.updateUI()
             }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.performDrawCard()
-            }
+            self.continueMLBotTurn(for: aiPlayer)
         }
     }
 
@@ -210,14 +326,8 @@ class GameScreenPresenter {
 
     private func resolveAITurnAfterPlaying(_ cardType: CardType, aiPlayer: Player, wasNoped: Bool) {
         if wasNoped {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self = self else { return }
-                guard self.gameState.currentPlayer?.id == aiPlayer.id else {
-                    self.triggerAITurnIfNeeded()
-                    return
-                }
-                self.performDrawCard()
-            }
+            // Действие отменили — карта потрачена, бот принимает решение заново.
+            continueMLBotTurn(for: aiPlayer)
             return
         }
         switch cardType {
@@ -228,14 +338,8 @@ class GameScreenPresenter {
             triggerAITurnIfNeeded()
 
         default:
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self = self else { return }
-                guard self.gameState.currentPlayer?.id == aiPlayer.id else {
-                    self.triggerAITurnIfNeeded()
-                    return
-                }
-                self.performDrawCard()
-            }
+            // favor / shuffle / seeTheFuture не завершают ход — бот ходит дальше (цепочка).
+            continueMLBotTurn(for: aiPlayer)
         }
     }
     
@@ -408,7 +512,15 @@ class GameScreenPresenter {
             gameState.isGameOver = true
             gameState.winner = alivePlayers.first
             if let winner = gameState.winner {
-                view?.navigateToGameOver(winner: winner)
+                // Если играл человек и есть записанные ходы — показываем разбор коуча,
+                // иначе сразу экран финала.
+                if let human = humanPlayer, !coachRecords.isEmpty {
+                    let didWin = winner.id == human.id
+                    let report = coachService.analyze(records: coachRecords, didWin: didWin)
+                    view?.showCoachAnalysis(report: report, winner: winner)
+                } else {
+                    view?.navigateToGameOver(winner: winner)
+                }
             }
         }
     }
@@ -436,6 +548,13 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
             view?.showMessage("This card cannot be played")
             return
         }
+        guard !isHumanBusy else { return }
+        isHumanBusy = true
+
+        // запись хода для коуча (до изменения состояния)
+        if let action = botAction(forSingle: card.type) {
+            recordHumanDecision(action, by: player)
+        }
 
         _ = player.removeCard(card)
         gameState.discardPile.append(card)
@@ -449,8 +568,14 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
                     self.handleCardPlay(card: card, player: player)
                     self.view?.showCardEffect(card.type)
                     self.handlePostHumanPlay(card: card, player: player)
+                    // skip/attack завершают ход (разблокирует endTurn / возврат от ИИ);
+                    // favor/shuffle/see — ход продолжается, разблокируем здесь.
+                    if card.type != .skip && card.type != .attack {
+                        self.isHumanBusy = false
+                    }
                 } else {
                     self.view?.showMessage("Action cancelled by Nope!")
+                    self.isHumanBusy = false   // карта отменена — ход продолжается
                 }
                 self.view?.updateUI()
             }
@@ -478,7 +603,10 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
     func drawCard() {
         guard let player = gameState.currentPlayer,
               player.type == .human else { return }
+        guard !isHumanBusy else { return }   // ход уже обрабатывается — игнорируем повторный тап
+        isHumanBusy = true
 
+        recordHumanDecision(.draw, by: player)
         performDrawCard()
     }
 
@@ -507,6 +635,11 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
             view?.showMessage("Можно играть 1, 2 или 3 карты")
             return
         }
+        guard !isHumanBusy else { return }
+        isHumanBusy = true
+
+        // запись комбо для коуча (до изменения состояния)
+        recordHumanDecision(cards.count == 2 ? .catPair : .catTrio, by: player)
 
         for c in cards {
             _ = player.removeCard(c)
@@ -531,6 +664,7 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
             guard !opponents.isEmpty else {
                 self.view?.showMessage("Нет соперников с картами")
                 self.view?.updateUI()
+                self.isHumanBusy = false   // комбо не завершает ход
                 return
             }
             self.view?.promptSelectPlayer(players: opponents) { [weak self] target in
@@ -542,6 +676,7 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
                 } else {
                     self.view?.updateUI()
                 }
+                self.isHumanBusy = false   // комбо не завершает ход — игрок ходит дальше
             }
         }
     }
@@ -555,6 +690,7 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
                 .filter { $0.id != player.id && $0.isAlive }
             guard !opponents.isEmpty else {
                 self.view?.updateUI()
+                self.isHumanBusy = false   // комбо не завершает ход
                 return
             }
             self.view?.promptSelectPlayer(players: opponents) { [weak self] target in
@@ -563,6 +699,7 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
                     guard let self = self else { return }
                     guard let requested = requested else {
                         self.view?.updateUI()
+                        self.isHumanBusy = false   // выбор отменён — ход продолжается
                         return
                     }
                     if let card = target.hand.first(where: { $0.type == requested }),
@@ -573,6 +710,7 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
                         self.view?.showMessage("У \(target.name) нет карты «\(requested.displayName)»")
                         self.view?.updateUI()
                     }
+                    self.isHumanBusy = false   // комбо не завершает ход — игрок ходит дальше
                 }
             }
         }
@@ -595,9 +733,13 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
         }
 
         view?.updateUI()
+        // ход вернулся к человеку — снимаем блокировку ввода
+        if gameState.currentPlayer?.type == .human {
+            isHumanBusy = false
+        }
         triggerAITurnIfNeeded()
     }
-    
+
     func settingsButtonTapped() {
         router?.navigateToSettings()
     }
@@ -611,6 +753,7 @@ extension GameScreenPresenter: GameScreenPresenterProtocol {
 // MARK: - GameScreenInteractorOutputProtocol
 extension GameScreenPresenter: GameScreenInteractorOutputProtocol {
     func cardDrawn(card: Card, by player: Player) {
+        popKnownTop(for: player)
         let isHuman = player.type == .human
         view?.showMessage(isHuman
             ? "\(player.name) drew: \(card.type.rawValue)"
@@ -629,6 +772,7 @@ extension GameScreenPresenter: GameScreenInteractorOutputProtocol {
     }
     
     func playerExploded(_ player: Player, hasDefuse: Bool) {
+        popKnownTop(for: player)
         if hasDefuse {
             if player.type == .ai {
                 view?.showMessage("\(player.name) defused the Exploding Kitten")
@@ -655,9 +799,13 @@ extension GameScreenPresenter: GameScreenInteractorOutputProtocol {
     }
     
     func showSeeTheFutureCards(_ cards: [Card]) {
-        if gameState.currentPlayer?.type == .ai {
+        if let cur = gameState.currentPlayer, cur.type == .ai {
             aiTopCardsKnowledge = cards.map { $0.type }
+            aiKnownTop[cur.id] = cards.map { $0.type }   // приватное знание для ML-бота
         } else {
+            if let human = humanPlayer {
+                aiKnownTop[human.id] = cards.map { $0.type }  // для obs коуча
+            }
             view?.showSeeTheFutureCards(cards)
         }
     }
@@ -673,6 +821,7 @@ extension GameScreenPresenter: GameScreenInteractorOutputProtocol {
     func cardEffectApplied(message: String) {
         if message == "Deck shuffled" {
             aiTopCardsKnowledge = []
+            aiKnownTop.removeAll()   // перемешивание обнуляет знание верхних карт
         }
         view?.showMessage(message)
         view?.updateUI()

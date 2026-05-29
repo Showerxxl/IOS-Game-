@@ -20,6 +20,7 @@ protocol GameScreenViewProtocol: AnyObject {
     func showNopeWindow(canPlayNope: Bool, completion: @escaping (NopeDecision) -> Void)
     func dismissNopeWindow()
     func navigateToGameOver(winner: Player)
+    func showCoachAnalysis(report: CoachReport, winner: Player)
     func showExplosion(playerName: String)
     func animateCardDraw(card: Card, by player: Player, revealFace: Bool, completion: @escaping () -> Void)
     func animateCardPlay(card: Card, by player: Player, completion: @escaping () -> Void)
@@ -1097,6 +1098,17 @@ extension GameScreenView: GameScreenViewProtocol {
         let gameOver = GameOverView(isWinner: isHuman, winnerName: winner.name)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
             self?.present(gameOver, animated: true)
+        }
+    }
+
+    func showCoachAnalysis(report: CoachReport, winner: Player) {
+        let isHuman = winner.type == .human
+        let coach = CoachAnalysisView(report: report) { [weak self] in
+            let gameOver = GameOverView(isWinner: isHuman, winnerName: winner.name)
+            self?.present(gameOver, animated: true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.present(coach, animated: true)
         }
     }
 

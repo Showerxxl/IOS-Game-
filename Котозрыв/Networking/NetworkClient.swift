@@ -32,28 +32,77 @@ final class NetworkClient {
     static let shared = NetworkClient()
     private init() {}
 
-    var baseURL    = "http://127.0.0.1:8080"
-    var wsBaseURL  = "ws://127.0.0.1:8080"
+    // MARK: - Server endpoint
+    //
+    // Варианты подключения (выбери ОДИН блок и раскомментируй):
+    //
+    // 1) Локальная сеть (LAN) — оба устройства в одной Wi-Fi:
+    //    static let serverHost = "192.168.2.61"
+    //    static let serverPort = 8080
+    //    static let useTLS     = false
+    //
+    // 2) ngrok-туннель (играть с любых сетей через интернет):
+    //    Подставь URL из вывода `ngrok http 8080`, БЕЗ "https://" и без слэша.
+    //    Пример: "abcd-1234.ngrok-free.app"
+    static let serverHost = "abcd-1234.ngrok-free.app"   // ← замени на свой ngrok-URL
+    static let serverPort = 443
+    static let useTLS     = true
+
+    var baseURL: String   = {
+        let scheme = NetworkClient.useTLS ? "https" : "http"
+        if NetworkClient.useTLS && NetworkClient.serverPort == 443 {
+            return "\(scheme)://\(NetworkClient.serverHost)"
+        }
+        return "\(scheme)://\(NetworkClient.serverHost):\(NetworkClient.serverPort)"
+    }()
+    var wsBaseURL: String = {
+        let scheme = NetworkClient.useTLS ? "wss" : "ws"
+        if NetworkClient.useTLS && NetworkClient.serverPort == 443 {
+            return "\(scheme)://\(NetworkClient.serverHost)"
+        }
+        return "\(scheme)://\(NetworkClient.serverHost):\(NetworkClient.serverPort)"
+    }()
 
     private var wsTask: URLSessionWebSocketTask?
     var onEvent: ((String, [String: Any]) -> Void)?
+
+    // 10-секундный таймаут, чтобы кнопки не «висели» при отсутствии сети.
+    private lazy var httpSession: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest  = 10
+        cfg.timeoutIntervalForResource = 15
+        cfg.waitsForConnectivity = false
+        return URLSession(configuration: cfg)
+    }()
 
     // MARK: - HTTP helpers
 
     private func post(_ path: String, body: [String: Any]?,
                       completion: @escaping (Data?, Error?) -> Void) {
-        var req = URLRequest(url: URL(string: baseURL + path)!)
+        let url = URL(string: baseURL + path)!
+        var req = URLRequest(url: url, timeoutInterval: 10)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let body = body {
             req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         }
-        URLSession.shared.dataTask(with: req) { d, _, e in completion(d, e) }.resume()
+        print("[NET] POST \(url.absoluteString) body=\(body ?? [:])")
+        httpSession.dataTask(with: req) { d, resp, e in
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            if let e = e {
+                print("[NET] POST \(path) error: \(e.localizedDescription)")
+            } else {
+                let preview = d.flatMap { String(data: $0, encoding: .utf8) } ?? "<no body>"
+                print("[NET] POST \(path) status=\(status) body=\(preview.prefix(200))")
+            }
+            completion(d, e)
+        }.resume()
     }
 
     private func get(_ path: String, completion: @escaping (Data?, Error?) -> Void) {
-        let req = URLRequest(url: URL(string: baseURL + path)!)
-        URLSession.shared.dataTask(with: req) { d, _, e in completion(d, e) }.resume()
+        let url = URL(string: baseURL + path)!
+        let req = URLRequest(url: url, timeoutInterval: 10)
+        httpSession.dataTask(with: req) { d, _, e in completion(d, e) }.resume()
     }
 
     // MARK: - Room API

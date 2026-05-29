@@ -96,3 +96,8 @@ iOSInjectionProject/
 *.md
 design/
 **/design/
+
+# ML — окружение, кэши и тяжёлый датасет (регенерируется скриптами)
+ML/.venv/
+**/__pycache__/
+ML/coach/coach_dataset.npz

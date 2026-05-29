@@ -1,0 +1,26 @@
+step   20000/400000  eps=0.92  loss=0.0181  WR vs random=73.3%  WR vs heuristic=54.0%  (1106 steps/s, pool=0)
+step   40000/400000  eps=0.84  loss=0.0367  WR vs random=64.7%  WR vs heuristic=51.0%  (1024 steps/s, pool=1)
+  -> сохранён чекпойнт уровня 'easy': /Users/mac/Desktop/term/Котозрыв/ML/checkpoints/dqn_easy.pt
+step   60000/400000  eps=0.76  loss=0.0471  WR vs random=68.0%  WR vs heuristic=51.0%  (999 steps/s, pool=2)
+step   80000/400000  eps=0.68  loss=0.0522  WR vs random=71.7%  WR vs heuristic=49.3%  (962 steps/s, pool=3)
+step  100000/400000  eps=0.60  loss=0.0421  WR vs random=74.0%  WR vs heuristic=56.7%  (936 steps/s, pool=4)
+step  120000/400000  eps=0.53  loss=0.0273  WR vs random=77.3%  WR vs heuristic=59.0%  (911 steps/s, pool=4)
+step  140000/400000  eps=0.45  loss=0.0216  WR vs random=82.0%  WR vs heuristic=56.7%  (879 steps/s, pool=5)
+step  160000/400000  eps=0.37  loss=0.0194  WR vs random=83.3%  WR vs heuristic=65.7%  (830 steps/s, pool=5)
+step  180000/400000  eps=0.29  loss=0.0187  WR vs random=78.7%  WR vs heuristic=60.7%  (798 steps/s, pool=5)
+step  200000/400000  eps=0.21  loss=0.0175  WR vs random=79.7%  WR vs heuristic=59.3%  (774 steps/s, pool=5)
+  -> сохранён чекпойнт уровня 'medium': /Users/mac/Desktop/term/Котозрыв/ML/checkpoints/dqn_medium.pt
+step  220000/400000  eps=0.13  loss=0.0160  WR vs random=84.0%  WR vs heuristic=66.3%  (753 steps/s, pool=5)
+step  240000/400000  eps=0.05  loss=0.0153  WR vs random=81.7%  WR vs heuristic=66.7%  (736 steps/s, pool=5)
+step  260000/400000  eps=0.05  loss=0.0144  WR vs random=84.7%  WR vs heuristic=63.0%  (725 steps/s, pool=5)
+step  280000/400000  eps=0.05  loss=0.0131  WR vs random=81.7%  WR vs heuristic=61.0%  (714 steps/s, pool=5)
+step  300000/400000  eps=0.05  loss=0.0128  WR vs random=86.3%  WR vs heuristic=65.0%  (705 steps/s, pool=5)
+step  320000/400000  eps=0.05  loss=0.0115  WR vs random=79.0%  WR vs heuristic=68.7%  (692 steps/s, pool=5)
+step  340000/400000  eps=0.05  loss=0.0121  WR vs random=81.0%  WR vs heuristic=65.0%  (685 steps/s, pool=5)
+step  360000/400000  eps=0.05  loss=0.0126  WR vs random=82.7%  WR vs heuristic=62.0%  (679 steps/s, pool=5)
+step  380000/400000  eps=0.05  loss=0.0119  WR vs random=87.7%  WR vs heuristic=68.3%  (674 steps/s, pool=5)
+step  400000/400000  eps=0.05  loss=0.0119  WR vs random=80.3%  WR vs heuristic=67.7%  (670 steps/s, pool=5)
+  -> сохранён чекпойнт уровня 'hard': /Users/mac/Desktop/term/Котозрыв/ML/checkpoints/dqn_hard.pt
+График сохранён: /Users/mac/Desktop/term/Котозрыв/ML/artifacts/winrate_curve.png
+
+Готово. Чекпойнты в checkpoints/, графики в artifacts/.
